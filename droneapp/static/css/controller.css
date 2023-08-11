@@ -1,0 +1,27 @@
+.controller-box{
+    text-align: center;
+}
+
+.wrapper {
+    display: flex;
+    justify-content: center;
+}
+
+.container {
+    width: 320px;
+    height: 240px;
+    position: relative;
+}
+
+.img-container {
+    text-align: center;
+}
+
+.active {
+    position: absolute;
+    border: 2px solid red;
+}
+
+.none {
+    display: none;
+}
