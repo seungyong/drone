@@ -76,6 +76,12 @@ const handleTouchEnd = (event) => {
     const relativeEndY = Math.max(computedStartY, computedEndY);
 
     sendCommand('setTracker', { relativeStartX, relativeStartY, relativeEndX, relativeEndY });
+
+    activeEle.classList.add('none');
+    activeEle.style.left = '0';
+    activeEle.style.top = '0';
+    activeEle.style.width = '0';
+    activeEle.style.height = '0';
 };
 
 const sendCommand = (command, params={}) => {

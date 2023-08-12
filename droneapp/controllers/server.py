@@ -40,14 +40,8 @@ def command():
         end_x = request.form.get('relativeEndX')
         end_y = request.form.get('relativeEndY')
 
-        logger.info({
-            'action': 'command',
-            'cmd': cmd,
-            'startX': start_x,
-            'startY': start_y,
-            'endX': end_x,
-            'endY': end_y
-        })
+        drone.set_coordinate(start_x, start_y, end_x, end_y)
+        drone.enable_object_tracking()
 
     if cmd == 'takeOff':
         drone.takeoff()
@@ -96,12 +90,13 @@ def command():
 
 def video_generator():
     drone = get_drone()
+
     for jpeg in drone.video_jpeg_generator():
         yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' +
-               jpeg +
-               b'\r\n\r\n')
-
+            b'Content-Type: image/jpeg\r\n\r\n' +
+            jpeg +
+            b'\r\n\r\n')
+        
 
 @app.route('/video/streaming')
 def video_feed():

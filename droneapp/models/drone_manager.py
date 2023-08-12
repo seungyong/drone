@@ -82,6 +82,14 @@ class DroneManager(metaclass=Singleton):
         self._command_semaphore = threading.Semaphore(1)
         self._command_thread = None
 
+        self.tracker = cv.TrackerCSRT_create()
+        self.start_x = 0
+        self.start_y = 0
+        self.end_x = 0
+        self.end_y = 0
+        self._is_init_object_tracking = False
+        self._is_object_tracking_mode = False
+
         self.send_command('command')
         self.send_command('streamon')
         self.set_speed(self.speed)
@@ -318,8 +326,34 @@ class DroneManager(metaclass=Singleton):
                     self.send_command(f'go {drone_x} {drone_y} {drone_z} {speed}',
                                       blocking=False)
                     break
+            elif self._is_object_tracking_mode:
+                if self._is_init_object_tracking == False:
+                    initial_bbox = (self.start_x, self.start_y, self.end_x - self.start_x, self.end_y - self.start_y)
+                    self.tracker.init(frame, initial_bbox)
+                    self._is_init_object_tracking = True
+
+                is_success, bbox = self.tracker.update(frame)
+                print(is_success)
+                print(bbox)
+                
+                if is_success:
+                    x, y, w, h = [int(val) for val in bbox]
+                    cv.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
             _, jpeg = cv.imencode('.jpg', frame)
             jpeg_binary = jpeg.tobytes()
             yield jpeg_binary
 
+    def set_coordinate(self, start_x, start_y, end_x, end_y):
+        self.start_x = int(float(start_x))
+        self.start_y = int(float(start_y))
+        self.end_x = int(float(end_x))
+        self.end_y = int(float(end_y))
+
+    def enable_object_tracking(self):
+        self._is_init_object_tracking = False
+        self._is_object_tracking_mode = True
+
+    def disable_object_tracking(self):
+        self._is_init_object_tracking = False
+        self._is_object_tracking_mode = False
