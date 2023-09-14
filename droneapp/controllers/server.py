@@ -43,6 +43,9 @@ def command():
         drone.set_coordinate(start_x, start_y, end_x, end_y)
         drone.enable_object_tracking()
 
+    if cmd == 'stopTracker':
+        drone.disable_object_tracking()
+
     if cmd == 'takeOff':
         drone.takeoff()
     if cmd == 'land':
@@ -69,22 +72,6 @@ def command():
         drone.left()
     if cmd == 'right':
         drone.right()
-    if cmd == 'flipFront':
-        drone.flip_front()
-    if cmd == 'flipBack':
-        drone.flip_back()
-    if cmd == 'flipLeft':
-        drone.flip_left()
-    if cmd == 'flipRight':
-        drone.flip_right()
-    if cmd == 'patrol':
-        drone.patrol()
-    if cmd == 'stopPatrol':
-        drone.stop_patrol()
-    if cmd == 'faceDetectAndTrack':
-        drone.enable_face_detect()
-    if cmd == 'stopFaceDetectAndTrack':
-        drone.disable_face_detect()
 
     return jsonify(status='success'), 200
 

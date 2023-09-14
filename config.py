@@ -13,6 +13,9 @@ LOG_FILE = 'pytello.log'
 
 app = Flask(__name__,
             template_folder=TEMPLATES,
-            static_folder=STATIC_FOLDER)
+            static_folder=STATIC_FOLDER,)
+
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+
 if DEBUG:
     app.debug = DEBUG

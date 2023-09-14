@@ -28,11 +28,6 @@ FRAME_CENTER_Y = FRAME_Y / 2
 CMD_FFMPEG = (f'ffmpeg -hwaccel auto -hwaccel_device opencl -i pipe:0 '
               f'-pix_fmt bgr24 -s {FRAME_X}x{FRAME_Y} -f rawvideo pipe:1')
 
-FACE_DETECT_XML_FILE = './droneapp/models/haarcascade_frontalface_default.xml'
-
-class ErrorNoFaceDetectXMLFile(Exception):
-    """Error no face detect xml file"""
-
 
 class DroneManager(metaclass=Singleton):
     def __init__(self, host_ip='192.168.10.2', host_port=8889,
@@ -54,11 +49,6 @@ class DroneManager(metaclass=Singleton):
                                            args=(self.stop_event, ))
         self._response_thread.start()
 
-        self.patrol_event = None
-        self.is_patrol = False
-        self._patrol_semaphore = threading.Semaphore(1)
-        self._thread_patrol = None
-
         self.proc = subprocess.Popen(CMD_FFMPEG.split(' '),
                                      stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE)
@@ -73,11 +63,6 @@ class DroneManager(metaclass=Singleton):
             args=(self.stop_event, self.proc_stdin,
                   self.host_ip, self.video_port,))
         self._receive_video_thread.start()
-
-        if not os.path.exists(FACE_DETECT_XML_FILE):
-            raise ErrorNoFaceDetectXMLFile(f'No {FACE_DETECT_XML_FILE}')
-        self.face_cascade = cv.CascadeClassifier(FACE_DETECT_XML_FILE)
-        self._is_enable_face_detect = False
 
         self._command_semaphore = threading.Semaphore(1)
         self._command_thread = None
@@ -194,59 +179,6 @@ class DroneManager(metaclass=Singleton):
     def counter_clockwise(self, degree=DEFAULT_DEGREE):
         return self.send_command(f'ccw {degree}')
 
-    def flip_front(self):
-        return self.send_command('flip f')
-
-    def flip_back(self):
-        return self.send_command('flip b')
-
-    def flip_left(self):
-        return self.send_command('flip l')
-
-    def flip_right(self):
-        return self.send_command('flip r')
-
-    def patrol(self):
-        if not self.is_patrol:
-            self.patrol_event = threading.Event()
-            self._thread_patrol = threading.Thread(
-                target=self._patrol,
-                args=(self._patrol_semaphore, self.patrol_event,))
-            self._thread_patrol.start()
-            self.is_patrol = True
-
-    def stop_patrol(self):
-        if self.is_patrol:
-            self.patrol_event.set()
-            retry = 0
-            while self._thread_patrol.isAlive():
-                time.sleep(0.3)
-                if retry > 300:
-                    break
-                retry += 1
-            self.is_patrol = False
-
-    def _patrol(self, semaphore, stop_event):
-        is_acquire = semaphore.acquire(blocking=False)
-        if is_acquire:
-            logger.info({'action': '_patrol', 'status': 'acquire'})
-            with contextlib.ExitStack() as stack:
-                stack.callback(semaphore.release)
-                status = 0
-                while not stop_event.is_set():
-                    status += 1
-                    if status == 1:
-                        self.up()
-                    if status == 2:
-                        self.clockwise(90)
-                    if status == 3:
-                        self.down()
-                    if status == 4:
-                        status = 0
-                    time.sleep(5)
-        else:
-            logger.warning({'action': '_patrol', 'status': 'not_acquire'})
-
     def receive_video(self, stop_event, pipe_in, host_ip, video_port):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock_video:
             sock_video.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -286,47 +218,9 @@ class DroneManager(metaclass=Singleton):
             frame = np.fromstring(frame, np.uint8).reshape(FRAME_Y, FRAME_X, 3)
             yield frame
 
-    def enable_face_detect(self):
-        self._is_enable_face_detect = True
-
-    def disable_face_detect(self):
-        self._is_enable_face_detect = False
-
     def video_jpeg_generator(self):
         for frame in self.video_binary_generator():
-            if self._is_enable_face_detect:
-                if self.is_patrol:
-                    self.stop_patrol()
-
-                gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-                faces = self.face_cascade.detectMultiScale(gray, 1.3, 5)
-                for (x, y, w, h) in faces:
-                    cv.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-
-                    face_center_x = x + (w/2)
-                    face_center_y = y + (h/2)
-                    diff_x = FRAME_CENTER_X - face_center_x
-                    diff_y = FRAME_CENTER_Y - face_center_y
-                    face_area = w * h
-                    percent_face = face_area / FRAME_AREA
-
-                    drone_x, drone_y, drone_z, speed = 0, 0, 0, self.speed
-                    if diff_x < -30:
-                        drone_y = -30
-                    if diff_x > 30:
-                        drone_y = 30
-                    if diff_y < -15:
-                        drone_z = -30
-                    if diff_y > 15:
-                        drone_z = 30
-                    if percent_face > 0.30:
-                        drone_x = -30
-                    if percent_face < 0.02:
-                        drone_x = 30
-                    self.send_command(f'go {drone_x} {drone_y} {drone_z} {speed}',
-                                      blocking=False)
-                    break
-            elif self._is_object_tracking_mode:
+            if self._is_object_tracking_mode:
                 if self._is_init_object_tracking == False:
                     initial_bbox = (self.start_x, self.start_y, self.end_x - self.start_x, self.end_y - self.start_y)
                     self.tracker.init(frame, initial_bbox)
@@ -338,7 +232,31 @@ class DroneManager(metaclass=Singleton):
                 
                 if is_success:
                     x, y, w, h = [int(val) for val in bbox]
-                    cv.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    cv.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 1)
+
+                    center_x = x + (w / 2)
+                    center_y = y + (y / 2)
+                    diff_x = FRAME_CENTER_X - center_x
+                    diff_y = FRAME_CENTER_Y - center_y
+                    object_area = w * h
+                    percent_object = object_area / FRAME_AREA
+
+                    drone_x, drone_y, drone_z, speed = 0, 0, 0, self.speed
+                    if diff_x < -30:
+                        drone_y = -30
+                    if diff_x > 30:
+                        drone_y = 30
+                    if diff_y < -15:
+                        drone_z = -30
+                    if diff_y > 15:
+                        drone_z = 30
+                    if percent_object > 0.30:
+                        drone_x = -30
+                    if percent_object < 0.02:
+                        drone_x = 30
+                        
+                    self.send_command(f'go {drone_x} {drone_y} {drone_z} {speed}',
+                                      blocking=False)
 
             _, jpeg = cv.imencode('.jpg', frame)
             jpeg_binary = jpeg.tobytes()
@@ -357,3 +275,5 @@ class DroneManager(metaclass=Singleton):
     def disable_object_tracking(self):
         self._is_init_object_tracking = False
         self._is_object_tracking_mode = False
+
+        

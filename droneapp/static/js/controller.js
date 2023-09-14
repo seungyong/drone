@@ -1,5 +1,7 @@
 let imgEle = null;
 let activeEle = null;
+let registerBtnEle = null;
+let removeBtnEle = null;
 let startX, startY, endX, endY = 0;
 
 const handleTouchStart = (event) => {
@@ -101,13 +103,31 @@ const setSpeed = () => {
     sendCommand('speed', params);
 };
 
+const registerEvent = () => {
+    registerBtnEle.classList.add('ui-disabled');
+    removeBtnEle.classList.remove('ui-disabled');
+
+    imgEle.addEventListener('touchstart', handleTouchStart);
+    imgEle.addEventListener('touchmove', handleTouchMove);
+    imgEle.addEventListener('touchend', handleTouchEnd);
+};
+
+const removeEvent = () => {
+    removeBtnEle.classList.add('ui-disabled');
+    registerBtnEle.classList.remove('ui-disabled');
+
+    imgEle.removeEventListener('touchstart', handleTouchStart);
+    imgEle.removeEventListener('touchmove', handleTouchMove);
+    imgEle.removeEventListener('touchend', handleTouchEnd);
+
+    sendCommand('stopTracker', {});
+};
+
 $(document).on('pageinit', () => {
     $('#slider-speed').on("slidestop", setSpeed);
 
     imgEle = document.querySelector('#img');
     activeEle = document.querySelector('#active');
-
-    imgEle.addEventListener('touchstart', handleTouchStart);
-    imgEle.addEventListener('touchmove', handleTouchMove);
-    imgEle.addEventListener('touchend', handleTouchEnd);
+    registerBtnEle = document.querySelector('#registerBtn');
+    removeBtnEle = document.querySelector('#removeBtn');
 });
